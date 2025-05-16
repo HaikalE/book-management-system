@@ -1,0 +1,20 @@
+{
+  "development": {
+    "config_path": "./src/config/database.js",
+    "models-path": "./src/models",
+    "seeders-path": "./src/seeders",
+    "migrations-path": "./src/migrations"
+  },
+  "test": {
+    "config_path": "./src/config/database.js",
+    "models-path": "./src/models",
+    "seeders-path": "./src/seeders",
+    "migrations-path": "./src/migrations"
+  },
+  "production": {
+    "config_path": "./src/config/database.js",
+    "models-path": "./src/models",
+    "seeders-path": "./src/seeders",
+    "migrations-path": "./src/migrations"
+  }
+}
