@@ -3,13 +3,31 @@ const { Op } = require('sequelize');
 
 // Helper to format price to Indonesian Rupiah format
 const formatPrice = (price) => {
-  return `Rp. ${parseFloat(price).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,').replace('.', ',')}`;
+  // Make sure price is a number and not null or undefined
+  const numericPrice = parseFloat(price) || 0;
+  
+  // Use toLocaleString for proper Indonesian formatting - no need for regex manipulation
+  return `Rp. ${numericPrice.toLocaleString('id-ID', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })}`;
 };
 
-// Helper to parse price from Indonesian Rupiah format
+// Helper to parse price from Indonesian Rupiah format or regular input
 const parsePrice = (price) => {
   if (!price) return 0;
-  return parseFloat(price.replace(/[^\d.,]/g, '').replace(',', '.'));
+  
+  // If price is already a number, return it directly
+  if (typeof price === 'number') return price;
+  
+  // Check if it's in Rupiah format (contains Rp. and possibly . as thousand separator and , as decimal)
+  if (typeof price === 'string' && price.includes('Rp.')) {
+    // Remove Rp., any dots (thousand separators), and replace comma with dot for decimal
+    return parseFloat(price.replace('Rp.', '').replace(/\./g, '').replace(',', '.'));
+  }
+  
+  // If it's a plain number string like "30000", just parse it directly
+  return parseFloat(price);
 };
 
 // Get all books with filtering, sorting, and pagination
@@ -185,8 +203,11 @@ exports.createBook = async (req, res) => {
       });
     }
     
-    // Parse price
+    // Parse price, making sure to handle both formatted and unformatted input
+    // Log original price for debugging
+    console.log('Original price input:', price);
     const parsedPrice = parsePrice(price);
+    console.log('Parsed price:', parsedPrice);
     
     // Create book
     const book = await Book.create({
@@ -337,7 +358,11 @@ exports.updateBook = async (req, res) => {
     
     if (title !== undefined) updateData.title = title;
     if (description !== undefined) updateData.description = description;
-    if (price !== undefined) updateData.price = parsePrice(price);
+    if (price !== undefined) {
+      console.log('Update - Original price input:', price);
+      updateData.price = parsePrice(price);
+      console.log('Update - Parsed price:', updateData.price);
+    }
     if (stock !== undefined) updateData.stock = stock;
     if (publisher !== undefined) updateData.publisher = publisher;
     
