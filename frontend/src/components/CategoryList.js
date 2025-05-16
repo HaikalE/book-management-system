@@ -1,12 +1,34 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
 
+// Custom hook for debouncing values
+const useDebounce = (value, delay) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    // Set debouncedValue to value after the specified delay
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    // Cancel the timeout if value changes or unmount
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+};
+
 const CategoryList = () => {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
   const [includeChildren, setIncludeChildren] = useState(true);
+
+  // Apply debouncing to search input
+  const debouncedSearch = useDebounce(search, 500);
 
   // Memoize fetchCategories function to avoid recreating it on every render
   const fetchCategories = useCallback(async () => {
@@ -15,7 +37,7 @@ const CategoryList = () => {
       
       const params = {
         includeChildren: includeChildren.toString(),
-        search: search || undefined
+        search: debouncedSearch || undefined
       };
       
       const response = await api.getCategories(params);
@@ -26,8 +48,9 @@ const CategoryList = () => {
       setError(err.message);
       setLoading(false);
     }
-  }, [search, includeChildren]);
+  }, [debouncedSearch, includeChildren]);
 
+  // Fetch categories when debounced search or includeChildren changes
   useEffect(() => {
     fetchCategories();
   }, [fetchCategories]);
@@ -66,9 +89,6 @@ const CategoryList = () => {
     ));
   };
 
-  if (loading) return <p>Loading...</p>;
-  if (error) return <p>Error: {error}</p>;
-
   return (
     <div>
       <div className="header">
@@ -93,25 +113,31 @@ const CategoryList = () => {
         </label>
       </div>
       
-      <table className="book-table">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Category Name</th>
-            <th>Parent Category</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {categories.length === 0 ? (
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '20px' }}>
+          <p>Loading categories...</p>
+        </div>
+      ) : (
+        <table className="book-table">
+          <thead>
             <tr>
-              <td colSpan="4" style={{ textAlign: 'center' }}>No categories found</td>
+              <th>ID</th>
+              <th>Category Name</th>
+              <th>Parent Category</th>
+              <th>Actions</th>
             </tr>
-          ) : (
-            renderCategoryTree(categories)
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {categories.length === 0 ? (
+              <tr>
+                <td colSpan="4" style={{ textAlign: 'center' }}>No categories found</td>
+              </tr>
+            ) : (
+              renderCategoryTree(categories)
+            )}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 };
