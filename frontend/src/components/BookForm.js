@@ -40,8 +40,12 @@ const BookForm = () => {
           // Parse price from format "Rp. 50.000,00" to number format for the form
           let price = book.price;
           if (typeof price === 'string') {
-            price = price.replace('Rp. ', '').replace('.', '').replace(',', '.');
+            // Remove "Rp. ", replace dots, replace comma with dot
+            price = price.replace('Rp. ', '').replace(/\./g, '').replace(',', '.');
           }
+          
+          console.log('Original price from API:', book.price);
+          console.log('Parsed price for form:', price);
           
           setFormData({
             title: book.title || '',
@@ -56,7 +60,8 @@ const BookForm = () => {
         
         setLoading(false);
       } catch (err) {
-        setError(err.message);
+        console.error('Error fetching data:', err);
+        setError(err.message || 'Error loading data');
         setLoading(false);
       }
     };
@@ -66,11 +71,20 @@ const BookForm = () => {
   
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    
+    // For price, make sure it's a valid number input
+    if (name === 'price') {
+      // Allow only numbers and decimal point
+      if (value === '' || /^\d*\.?\d*$/.test(value)) {
+        setFormData(prev => ({ ...prev, [name]: value }));
+      }
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
   };
   
   const handleCategoryChange = (e) => {
-    const categoryId = parseInt(e.target.value);
+    const categoryId = parseInt(e.target.value, 10);
     
     setFormData(prev => {
       const categoryExists = prev.categories.includes(categoryId);
@@ -120,21 +134,31 @@ const BookForm = () => {
     setError(null);
     
     try {
-      // Format price to Rupiah format
-      const formattedData = {
+      // Make sure price is a number before submitting
+      const numericPrice = parseFloat(formData.price);
+      
+      if (isNaN(numericPrice)) {
+        throw new Error('Price must be a valid number');
+      }
+      
+      console.log('Submitting price:', numericPrice);
+      
+      // Send just the numeric price without formatting
+      const dataToSubmit = {
         ...formData,
-        price: `Rp. ${parseFloat(formData.price).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.')}`
+        price: numericPrice
       };
       
       if (isEditMode) {
-        await api.updateBook(id, formattedData);
+        await api.updateBook(id, dataToSubmit);
       } else {
-        await api.createBook(formattedData);
+        await api.createBook(dataToSubmit);
       }
       
       navigate('/');
     } catch (err) {
-      setError(err.message);
+      console.error('Error submitting form:', err);
+      setError(err.message || 'Error saving book');
       setIsSubmitting(false);
     }
   };
@@ -145,79 +169,109 @@ const BookForm = () => {
     <div>
       <h2>{isEditMode ? 'Edit Book' : 'Add New Book'}</h2>
       
-      {error && <div style={{ color: 'red', marginBottom: '15px' }}>{error}</div>}
+      {error && (
+        <div style={{ 
+          color: 'white', 
+          backgroundColor: '#f44336',
+          padding: '10px',
+          marginBottom: '15px',
+          borderRadius: '4px' 
+        }}>
+          {error}
+        </div>
+      )}
       
       <form onSubmit={handleSubmit}>
         <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+          <label 
+            htmlFor="bookTitle"
+            style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}
+          >
             Book Title*:
           </label>
           <input
+            id="bookTitle"
             type="text"
             name="title"
             value={formData.title}
             onChange={handleChange}
-            style={{ width: '100%', padding: '8px' }}
+            style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
             required
           />
         </div>
         
         <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+          <label 
+            htmlFor="bookDescription"
+            style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}
+          >
             Description*:
           </label>
           <textarea
+            id="bookDescription"
             name="description"
             value={formData.description}
             onChange={handleChange}
             rows={5}
-            style={{ width: '100%', padding: '8px' }}
+            style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
             required
           />
         </div>
         
         <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+          <label 
+            htmlFor="bookPrice"
+            style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}
+          >
             Price* (in IDR):
           </label>
           <input
-            type="number"
+            id="bookPrice"
+            type="text"
             name="price"
             value={formData.price}
             onChange={handleChange}
-            style={{ width: '100%', padding: '8px' }}
-            min="0"
-            step="0.01"
+            style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
             required
           />
-          <small>Will be formatted as Rp. xx.xxx,xx</small>
+          <small style={{ color: '#666' }}>
+            Enter the full price without formatting (e.g., "30000" for Rp. 30.000,00)
+          </small>
         </div>
         
         <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+          <label 
+            htmlFor="bookStock"
+            style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}
+          >
             Stock*:
           </label>
           <input
+            id="bookStock"
             type="number"
             name="stock"
             value={formData.stock}
             onChange={handleChange}
-            style={{ width: '100%', padding: '8px' }}
+            style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
             min="0"
             required
           />
         </div>
         
         <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+          <label 
+            htmlFor="bookPublisher"
+            style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}
+          >
             Publisher*:
           </label>
           <input
+            id="bookPublisher"
             type="text"
             name="publisher"
             value={formData.publisher}
             onChange={handleChange}
-            style={{ width: '100%', padding: '8px' }}
+            style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
             required
           />
         </div>
@@ -226,7 +280,13 @@ const BookForm = () => {
           <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
             Categories:
           </label>
-          <div style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid #ccc', padding: '10px' }}>
+          <div style={{ 
+            maxHeight: '150px', 
+            overflowY: 'auto', 
+            border: '1px solid #ccc', 
+            padding: '10px',
+            borderRadius: '4px'
+          }}>
             {categories.length === 0 ? (
               <p>No categories available</p>
             ) : (
@@ -248,21 +308,38 @@ const BookForm = () => {
         </div>
         
         <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+          <label 
+            htmlFor="bookKeywords"
+            style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}
+          >
             Keywords:
           </label>
           <div style={{ display: 'flex', marginBottom: '10px' }}>
             <input
+              id="bookKeywords"
               type="text"
               value={keywordInput}
               onChange={(e) => setKeywordInput(e.target.value)}
-              style={{ flex: 1, padding: '8px', marginRight: '10px' }}
+              style={{ 
+                flex: 1, 
+                padding: '8px', 
+                marginRight: '10px',
+                borderRadius: '4px', 
+                border: '1px solid #ccc'
+              }}
               placeholder="Type a keyword"
             />
             <button
               type="button"
               onClick={handleAddKeyword}
-              style={{ padding: '8px 15px', backgroundColor: '#4CAF50', color: 'white', border: 'none', cursor: 'pointer' }}
+              style={{ 
+                padding: '8px 15px', 
+                backgroundColor: '#4CAF50', 
+                color: 'white', 
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
             >
               Add
             </button>
@@ -308,8 +385,10 @@ const BookForm = () => {
               backgroundColor: '#4CAF50',
               color: 'white',
               border: 'none',
+              borderRadius: '4px',
               cursor: isSubmitting ? 'not-allowed' : 'pointer',
-              opacity: isSubmitting ? 0.7 : 1
+              opacity: isSubmitting ? 0.7 : 1,
+              fontWeight: 'bold'
             }}
           >
             {isSubmitting ? 'Saving...' : (isEditMode ? 'Update Book' : 'Add Book')}
@@ -323,7 +402,9 @@ const BookForm = () => {
               backgroundColor: '#f44336',
               color: 'white',
               border: 'none',
-              cursor: 'pointer'
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontWeight: 'bold'
             }}
           >
             Cancel
