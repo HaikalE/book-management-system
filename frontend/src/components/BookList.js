@@ -1,6 +1,25 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
 
+// Custom hook for debouncing values
+const useDebounce = (value, delay) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    // Set debouncedValue to value after the specified delay
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    // Cancel the timeout if value changes or unmount
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+};
+
 const BookList = () => {
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -24,6 +43,18 @@ const BookList = () => {
     sortBy: 'id',
     sortDir: 'ASC'
   });
+  
+  // Apply debouncing to all filter values
+  const debouncedFilters = {
+    title: useDebounce(filters.title, 500),
+    category: useDebounce(filters.category, 500),
+    keyword: useDebounce(filters.keyword, 500),
+    publisher: useDebounce(filters.publisher, 500),
+    minPrice: useDebounce(filters.minPrice, 500),
+    maxPrice: useDebounce(filters.maxPrice, 500),
+    sortBy: filters.sortBy, // No need to debounce these
+    sortDir: filters.sortDir
+  };
 
   // Memoize fetchBooks function to avoid it being recreated on every render
   const fetchBooks = useCallback(async () => {
@@ -34,7 +65,7 @@ const BookList = () => {
       const params = {
         page: pagination.currentPage,
         limit: pagination.itemsPerPage,
-        ...filters
+        ...debouncedFilters
       };
       
       // Remove empty filter values
@@ -53,8 +84,9 @@ const BookList = () => {
       setError(err.message);
       setLoading(false);
     }
-  }, [pagination.currentPage, pagination.itemsPerPage, filters]);
+  }, [pagination.currentPage, pagination.itemsPerPage, debouncedFilters]);
 
+  // Fetch books when debounced filters or pagination changes
   useEffect(() => {
     fetchBooks();
   }, [fetchBooks]);
@@ -62,8 +94,11 @@ const BookList = () => {
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters(prev => ({ ...prev, [name]: value }));
-    // Reset to first page when filter changes
-    setPagination(prev => ({ ...prev, currentPage: 1 }));
+    
+    // Only reset to first page if it's a filter change, not sorting
+    if (!['sortBy', 'sortDir'].includes(name)) {
+      setPagination(prev => ({ ...prev, currentPage: 1 }));
+    }
   };
 
   const handleSelectAll = (e) => {
@@ -155,9 +190,6 @@ const BookList = () => {
     );
   };
 
-  if (loading) return <p>Loading...</p>;
-  if (error) return <p>Error: {error}</p>;
-
   return (
     <div>
       <div className="header">
@@ -235,62 +267,70 @@ const BookList = () => {
         </select>
       </div>
       
-      <table className="book-table">
-        <thead>
-          <tr>
-            <th>
-              <input
-                type="checkbox"
-                onChange={handleSelectAll}
-                checked={selectedBooks.length === books.length && books.length > 0}
-              />
-            </th>
-            <th>No.</th>
-            <th>Title</th>
-            <th>Description</th>
-            <th>Category</th>
-            <th>Keywords</th>
-            <th>Price</th>
-            <th>Stock</th>
-            <th>Publisher</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {books.length === 0 ? (
-            <tr>
-              <td colSpan="10" style={{ textAlign: 'center' }}>No books found</td>
-            </tr>
-          ) : (
-            books.map((book, index) => (
-              <tr key={book.id}>
-                <td>
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '20px' }}>
+          <p>Loading books...</p>
+        </div>
+      ) : (
+        <>
+          <table className="book-table">
+            <thead>
+              <tr>
+                <th>
                   <input
                     type="checkbox"
-                    checked={selectedBooks.includes(book.id)}
-                    onChange={(e) => handleSelectBook(e, book.id)}
+                    onChange={handleSelectAll}
+                    checked={selectedBooks.length === books.length && books.length > 0}
                   />
-                </td>
-                <td>{(pagination.currentPage - 1) * pagination.itemsPerPage + index + 1}</td>
-                <td>{book.title}</td>
-                <td>{book.description.length > 50 ? `${book.description.substring(0, 50)}...` : book.description}</td>
-                <td>{book.categories?.map(cat => cat.name).join(', ')}</td>
-                <td>{book.keywords?.map(kw => kw.name).join(', ')}</td>
-                <td>{book.price}</td>
-                <td>{book.stock}</td>
-                <td>{book.publisher}</td>
-                <td>
-                  <button onClick={() => window.location.href = `/books/view/${book.id}`}>View</button> |{' '}
-                  <button onClick={() => window.location.href = `/books/edit/${book.id}`}>Edit</button> |{' '}
-                  <button onClick={() => handleDeleteBook(book.id, book.title)}>Delete</button>
-                </td>
+                </th>
+                <th>No.</th>
+                <th>Title</th>
+                <th>Description</th>
+                <th>Category</th>
+                <th>Keywords</th>
+                <th>Price</th>
+                <th>Stock</th>
+                <th>Publisher</th>
+                <th>Actions</th>
               </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-      
-      {renderPagination()}
+            </thead>
+            <tbody>
+              {books.length === 0 ? (
+                <tr>
+                  <td colSpan="10" style={{ textAlign: 'center' }}>No books found</td>
+                </tr>
+              ) : (
+                books.map((book, index) => (
+                  <tr key={book.id}>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={selectedBooks.includes(book.id)}
+                        onChange={(e) => handleSelectBook(e, book.id)}
+                      />
+                    </td>
+                    <td>{(pagination.currentPage - 1) * pagination.itemsPerPage + index + 1}</td>
+                    <td>{book.title}</td>
+                    <td>{book.description.length > 50 ? `${book.description.substring(0, 50)}...` : book.description}</td>
+                    <td>{book.categories?.map(cat => cat.name).join(', ')}</td>
+                    <td>{book.keywords?.map(kw => kw.name).join(', ')}</td>
+                    <td>{book.price}</td>
+                    <td>{book.stock}</td>
+                    <td>{book.publisher}</td>
+                    <td>
+                      <button onClick={() => window.location.href = `/books/view/${book.id}`}>View</button> |{' '}
+                      <button onClick={() => window.location.href = `/books/edit/${book.id}`}>Edit</button> |{' '}
+                      <button onClick={() => handleDeleteBook(book.id, book.title)}>Delete</button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+          
+          {renderPagination()}
+        </>
+      )}
     </div>
   );
 };
