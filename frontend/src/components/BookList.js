@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
 
 const BookList = () => {
@@ -25,11 +25,8 @@ const BookList = () => {
     sortDir: 'ASC'
   });
 
-  useEffect(() => {
-    fetchBooks();
-  }, [pagination.currentPage, filters]);
-
-  const fetchBooks = async () => {
+  // Memoize fetchBooks function to avoid it being recreated on every render
+  const fetchBooks = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -56,7 +53,11 @@ const BookList = () => {
       setError(err.message);
       setLoading(false);
     }
-  };
+  }, [pagination.currentPage, pagination.itemsPerPage, filters]);
+
+  useEffect(() => {
+    fetchBooks();
+  }, [fetchBooks]);
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
@@ -89,6 +90,17 @@ const BookList = () => {
         await api.deleteManyBooks(selectedBooks);
         fetchBooks();
         setSelectedBooks([]);
+      } catch (err) {
+        setError(err.message);
+      }
+    }
+  };
+
+  const handleDeleteBook = async (id, title) => {
+    if (window.confirm(`Delete ${title}?`)) {
+      try {
+        await api.deleteBook(id);
+        fetchBooks();
       } catch (err) {
         setError(err.message);
       }
@@ -268,9 +280,9 @@ const BookList = () => {
                 <td>{book.stock}</td>
                 <td>{book.publisher}</td>
                 <td>
-                  <a href={`/books/edit/${book.id}`}>View</a> |{' '}
-                  <a href={`/books/edit/${book.id}`}>Edit</a> |{' '}
-                  <a href="#" onClick={() => window.confirm(`Delete ${book.title}?`) && api.deleteBook(book.id).then(fetchBooks)}>Delete</a>
+                  <button onClick={() => window.location.href = `/books/view/${book.id}`}>View</button> |{' '}
+                  <button onClick={() => window.location.href = `/books/edit/${book.id}`}>Edit</button> |{' '}
+                  <button onClick={() => handleDeleteBook(book.id, book.title)}>Delete</button>
                 </td>
               </tr>
             ))
