@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
 
 const CategoryList = () => {
@@ -8,11 +8,8 @@ const CategoryList = () => {
   const [search, setSearch] = useState('');
   const [includeChildren, setIncludeChildren] = useState(true);
 
-  useEffect(() => {
-    fetchCategories();
-  }, [search, includeChildren]);
-
-  const fetchCategories = async () => {
+  // Memoize fetchCategories function to avoid recreating it on every render
+  const fetchCategories = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -29,7 +26,11 @@ const CategoryList = () => {
       setError(err.message);
       setLoading(false);
     }
-  };
+  }, [search, includeChildren]);
+
+  useEffect(() => {
+    fetchCategories();
+  }, [fetchCategories]);
 
   const handleDelete = async (id, name) => {
     if (window.confirm(`Are you sure you want to delete category "${name}"? This will also delete all child categories.`)) {
@@ -53,9 +54,9 @@ const CategoryList = () => {
           </td>
           <td>{category.parent ? category.parent.name : 'None'}</td>
           <td>
-            <a href={`/categories/edit/${category.id}`}>View</a> |{' '}
-            <a href={`/categories/edit/${category.id}`}>Edit</a> |{' '}
-            <a href="#" onClick={() => handleDelete(category.id, category.name)}>Delete</a>
+            <button onClick={() => window.location.href = `/categories/view/${category.id}`}>View</button> |{' '}
+            <button onClick={() => window.location.href = `/categories/edit/${category.id}`}>Edit</button> |{' '}
+            <button onClick={() => handleDelete(category.id, category.name)}>Delete</button>
           </td>
         </tr>
         {category.children && category.children.length > 0 && 
