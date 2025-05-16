@@ -52,7 +52,7 @@ const CategoryList = () => {
   const applySearch = useCallback((searchTerm) => {
     appliedSearchRef.current = searchTerm;
     fetchCategories();
-  }, [fetchBooks]);
+  }, [fetchCategories]);
 
   // Apply include children change
   const applyIncludeChildren = useCallback((value) => {
